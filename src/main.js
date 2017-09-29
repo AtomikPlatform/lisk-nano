@@ -9,9 +9,11 @@ import store from './store';
 import i18n from './i18n'; // initialized i18next instance
 import proxyLogin from './utils/proxyLogin';
 import env from './constants/env';
+import ipcLocale from './utils/ipcLocale';
 
 if (env.production) {
   proxyLogin.init();
+  ipcLocale.init(i18n);
 }
 
 const rootElement = document.getElementById('app');
