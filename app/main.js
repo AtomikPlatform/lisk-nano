@@ -1,8 +1,13 @@
 const electron = require('electron'); // eslint-disable-line import/no-extraneous-dependencies
 const path = require('path');
 const buildMenu = require('./menu');
+const osLocale = require('os-locale'); // eslint-disable-line import/no-extraneous-dependencies
+const Localization = require('./i18n');
 
 const { app, BrowserWindow, Menu, ipcMain } = electron;
+
+let defaultLng = osLocale.sync();
+let i18n = new Localization(defaultLng);
 
 let win;
 let isUILoaded = false;
@@ -16,6 +21,14 @@ const sendUrlToRouter = (url) => {
     win.webContents.send('openUrl', url);
   } else {
     eventStack.push({ event: 'openUrl', value: url });
+  }
+};
+
+const sendDetectedLang = (locale) => {
+  if (isUILoaded && win && win.webContents) {
+    win.webContents.send('detectedLocale', locale);
+  } else {
+    eventStack.push({ event: 'detectedLocale', value: locale });
   }
 };
 
@@ -39,7 +52,7 @@ function createWindow() {
     sendUrlToRouter(process.argv.slice(1));
   }
 
-  Menu.setApplicationMenu(buildMenu(app, copyright));
+  Menu.setApplicationMenu(buildMenu(app, copyright, i18n.t));
 
   win.loadURL(`file://${__dirname}/dist/index.html`);
 
@@ -122,6 +135,8 @@ if (isSecondInstance) {
 }
 
 app.on('will-finish-launching', () => {
+  sendDetectedLang(defaultLng);
+
   // Protocol handler for MacOS
   app.on('open-url', (event, url) => {
     event.preventDefault();
@@ -139,3 +154,11 @@ ipcMain.on('proxyCredentialsEntered', (event, username, password) => {
   global.myTempFunction(username, password);
 });
 
+ipcMain.on('set-locale', (event, locale) => {
+  if (locale.substr(0, 2) !== defaultLng.substr(0, 2)) {
+    i18n = new Localization(locale);
+    Menu.setApplicationMenu(buildMenu(app, copyright, i18n.t));
+    defaultLng = locale;
+    event.returnValue = 'Rebuilt electron menu.';
+  }
+});
