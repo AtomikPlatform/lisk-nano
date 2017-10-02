@@ -1,13 +1,12 @@
 const electron = require('electron'); // eslint-disable-line import/no-extraneous-dependencies
 const path = require('path');
 const buildMenu = require('./menu');
-const osLocale = require('os-locale'); // eslint-disable-line import/no-extraneous-dependencies
 const Localization = require('./i18n');
 
 const { app, BrowserWindow, Menu, ipcMain } = electron;
 
-let defaultLng = osLocale.sync();
-let i18n = new Localization(defaultLng);
+const i18n = new Localization();
+let defaultLng = 'en';
 
 let win;
 let isUILoaded = false;
@@ -32,67 +31,77 @@ const sendDetectedLang = (locale) => {
   }
 };
 
-function createWindow() {
-  const { width, height } = electron.screen.getPrimaryDisplay().workAreaSize;
-  win = new BrowserWindow({
-    width: width > 2000 ? Math.floor(width * 0.5) : width - 250,
-    height: height > 1000 ? Math.floor(height * 0.7) : height - 150,
-    center: true,
-    webPreferences: {
-      // Avoid app throttling when Electron is in background
-      backgroundThrottling: false,
-      // Specifies a script that will be loaded before other scripts run in the page.
-      preload: path.resolve(__dirname, 'ipc.js'),
-    },
-  });
-  win.on('blur', () => win.webContents.send('blur'));
-  win.on('focus', () => win.webContents.send('focus'));
+const createWindow = () => {
+  i18n.getLng((data) => {
+    // Getting the default/stored language
+    defaultLng = data;
+    i18n.init(defaultLng);
 
-  if (process.platform === 'win32') {
-    sendUrlToRouter(process.argv.slice(1));
-  }
+    // set language of the react app
+    sendDetectedLang(defaultLng);
 
-  Menu.setApplicationMenu(buildMenu(app, copyright, i18n.t));
+    // initiating window
+    const { width, height } = electron.screen.getPrimaryDisplay().workAreaSize;
+    win = new BrowserWindow({
+      width: width > 2000 ? Math.floor(width * 0.5) : width - 250,
+      height: height > 1000 ? Math.floor(height * 0.7) : height - 150,
+      center: true,
+      webPreferences: {
+        // Avoid app throttling when Electron is in background
+        backgroundThrottling: false,
+        // Specifies a script that will be loaded before other scripts run in the page.
+        preload: path.resolve(__dirname, 'ipc.js'),
+      },
+    });
+    win.on('blur', () => win.webContents.send('blur'));
+    win.on('focus', () => win.webContents.send('focus'));
 
-  win.loadURL(`file://${__dirname}/dist/index.html`);
-
-  win.on('closed', () => { win = null; });
-
-  const selectionMenu = Menu.buildFromTemplate([
-    { role: 'copy' },
-    { type: 'separator' },
-    { role: 'selectall' },
-  ]);
-
-  const inputMenu = Menu.buildFromTemplate([
-    { role: 'undo' },
-    { role: 'redo' },
-    { type: 'separator' },
-    { role: 'cut' },
-    { role: 'copy' },
-    { role: 'paste' },
-    { type: 'separator' },
-    { role: 'selectall' },
-  ]);
-
-  win.webContents.on('context-menu', (e, props) => {
-    const { selectionText, isEditable } = props;
-    if (isEditable) {
-      inputMenu.popup(win);
-    } else if (selectionText && selectionText.trim() !== '') {
-      selectionMenu.popup(win);
+    if (process.platform === 'win32') {
+      sendUrlToRouter(process.argv.slice(1));
     }
-  });
 
-  // Resolve all events from stack when dom is ready
-  win.webContents.on('did-finish-load', () => {
-    isUILoaded = true;
-    if (eventStack.length > 0) {
-      eventStack.forEach(({ event, value }) => win.webContents.send(event, value));
-      eventStack = [];
-    }
+    Menu.setApplicationMenu(buildMenu(app, copyright, i18n.t));
+
+    win.loadURL(`file://${__dirname}/dist/index.html`);
+
+    win.on('closed', () => { win = null; });
+
+    const selectionMenu = Menu.buildFromTemplate([
+      { role: 'copy' },
+      { type: 'separator' },
+      { role: 'selectall' },
+    ]);
+
+    const inputMenu = Menu.buildFromTemplate([
+      { role: 'undo' },
+      { role: 'redo' },
+      { type: 'separator' },
+      { role: 'cut' },
+      { role: 'copy' },
+      { role: 'paste' },
+      { type: 'separator' },
+      { role: 'selectall' },
+    ]);
+
+    win.webContents.on('context-menu', (e, props) => {
+      const { selectionText, isEditable } = props;
+      if (isEditable) {
+        inputMenu.popup(win);
+      } else if (selectionText && selectionText.trim() !== '') {
+        selectionMenu.popup(win);
+      }
+    });
+
+    // Resolve all events from stack when dom is ready
+    win.webContents.on('did-finish-load', () => {
+      isUILoaded = true;
+      if (eventStack.length > 0) {
+        eventStack.forEach(({ event, value }) => win.webContents.send(event, value));
+        eventStack = [];
+      }
+    });
   });
-}
+};
 
 app.on('ready', createWindow);
 
@@ -135,8 +144,6 @@ if (isSecondInstance) {
 }
 
 app.on('will-finish-launching', () => {
-  sendDetectedLang(defaultLng);
-
   // Protocol handler for MacOS
   app.on('open-url', (event, url) => {
     event.preventDefault();
@@ -155,10 +162,11 @@ ipcMain.on('proxyCredentialsEntered', (event, username, password) => {
 });
 
 ipcMain.on('set-locale', (event, locale) => {
-  if (locale.substr(0, 2) !== defaultLng.substr(0, 2)) {
-    i18n = new Localization(locale);
+  if (locale.substr(0, 2) !== defaultLng) {
+    i18n.init(locale.substr(0, 2));
     Menu.setApplicationMenu(buildMenu(app, copyright, i18n.t));
     defaultLng = locale;
+    i18n.setLng(defaultLng);
     event.returnValue = 'Rebuilt electron menu.';
   }
 });

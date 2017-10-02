@@ -32,6 +32,7 @@
     "bignumber.js": "4.0.4",
     "bitcore-mnemonic": "1.2.5",
     "copy-to-clipboard": "3.0.8",
+    "electron-json-storage": "^3.1.1",
     "flexboxgrid": "=6.3.1",
     "history": "^4.7.2",
     "i18next": "^9.0.0",
@@ -134,7 +135,9 @@
     "productName": "Lisk Nano",
     "protocols": {
       "name": "lisk-nano",
-      "schemes": ["lisk"]
+      "schemes": [
+        "lisk"
+      ]
     },
     "artifactName": "lisk-nano-${os}-${arch}-${version}.${ext}",
     "linux": {
