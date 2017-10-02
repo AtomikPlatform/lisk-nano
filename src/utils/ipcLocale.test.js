@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import { spy } from 'sinon';
 import ipcLocale from './ipcLocale';
 
-describe.only('ipcLocale', () => {
+describe('ipcLocale', () => {
   const ipc = {
     on: spy(),
     send: spy(),
